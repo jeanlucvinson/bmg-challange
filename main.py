@@ -6,6 +6,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import geopandas as gpd
+import pandas as pd
+import os
+from shapely.geometry import Polygon, Point
 
 
 def read_data_file(file_path: str) -> pd.DataFrame:
@@ -32,75 +35,107 @@ def read_contour_file(file_path: str) -> pd.DataFrame:
 
 
 def apply_contour(contour_df: pd.DataFrame, data_df: pd.DataFrame) -> pd.DataFrame:
-    pass
+    
+    #ler o arquivo do contour e criar coluna com as coordenadas
+    df_contour = read_contour_file('PSATCMG_CAMARGOS.bln')
+    df_map = df_coordenadas(df=df_contour)
 
+    nomes_arquivos = lista_arquvios(pasta="forecast_files")
+
+    df_final = []
+    for arquivo in nomes_arquivos:
+
+        data_inicial, data_final = extrair_datas(arquivo=arquivo)
+
+        #lendo o arquivo ETA
+        df_forcast_file = pd.DataFrame(read_data_file(f'forecast_files/{arquivo}'))
+
+        #criar coluna com as coordenadas do ETA
+        df_eta = df_coordenadas(df=df_forcast_file)
+
+        #Coordenadas dos polígonos camargos em uma lista
+        polygon_coordinates = df_map['coordenadas'].tolist()
+
+        # Criando um objeto Polygon com as coordenadas dos polígonos
+        polygon = Polygon(polygon_coordinates)
+
+        # Coordenadas a serem verificadas em uma lista
+        points_to_check = df_eta['coordenadas'].tolist()
+
+        # Verificando se as coordenadas estão dentro do polígono e adicionando as coordenadas corretas em uma lista
+        lista_coordenadas = coordeandas_dentro_da_area(polygon, points_to_check)
+
+        #somar a precipitação do dia caso as coordenadas estejam iguais
+        soma = soma_precipitacao(df_forcast_file, lista_coordenadas)
+
+        # Criar um DataFrame com as datas
+        df = montar_df_parcial(data_inicial, data_final, soma)
+
+        #
+        df_final.append(df)
+
+    #concatenando o df final 
+    df_tratado = pd.concat(df_final, ignore_index=True)
+    print(df_tratado)
+
+def montar_df_parcial(data_inicial, data_final, soma):
+    return pd.DataFrame(
+        {
+            'forecast_date': [data_inicial],
+            'forecasted_date': [data_final],
+            'data_value': [soma]
+        }
+        )
+
+def soma_precipitacao(df_forcast_file, lista_coordenadas):
+    soma = 0
+    for index, row in df_forcast_file.iterrows():
+        if [row['lat'], row['long']] in lista_coordenadas:
+            soma += row['data_value']
+    return soma
+
+def coordeandas_dentro_da_area(polygon, points_to_check):
+    lista_coordenadas = []
+    for point in points_to_check:
+        x, y = point[0], point[1]
+        point_obj = Point(x, y)
+        if polygon.contains(point_obj):
+            lista_coordenadas.append(point)
+    return lista_coordenadas
+
+def df_coordenadas(df):
+    lista = []
+
+    for index, row in df.iterrows():
+        row['coordenadas'] = [row['lat'], row['long']]
+        lista.append(row)
+
+    return pd.DataFrame(lista) 
+
+def lista_arquvios(pasta):
+    nomes_arquivos = []
+
+    #lendo todos arquvios e colocando os nomes em uma lista
+    for nome_arquivo in os.listdir(pasta):
+        if os.path.isfile(os.path.join(pasta, nome_arquivo)):
+            nomes_arquivos.append(nome_arquivo)
+    return nomes_arquivos
+
+def extrair_datas(arquivo):
+    # Extrair as datas do nome do arquivo
+    data_inicial_str = arquivo.split("_p")[1][:6]
+    data_final_str = arquivo.split("a")[1][:6]
+
+    # Converter as datas para o formato desejado (DD/MM/YYYY)
+    data_inicial = pd.to_datetime(data_inicial_str, format='%d%m%y').strftime('%d/%m/%Y')
+    data_final = pd.to_datetime(data_final_str, format='%d%m%y').strftime('%d/%m/%Y')
+
+    return data_inicial, data_final
 
 def main() -> None:
     contour_df: pd.DataFrame = read_contour_file('PSATCMG_CAMARGOS.bln')
     data_df: pd.DataFrame = read_data_file('forecast_files/ETA40_p011221a021221.dat')
     contour_df: pd.DataFrame = apply_contour(contour_df=contour_df, data_df=data_df)
 
-
 if __name__ == '__main__':
     main()
-
-
-df_02 = pd.DataFrame(read_data_file('forecast_files/ETA40_p011221a021221.dat'))
-df_03 = pd.DataFrame(read_data_file('forecast_files/ETA40_p011221a031221.dat'))
-df_04 = pd.DataFrame(read_data_file('forecast_files/ETA40_p011221a041221.dat'))
-df_05 = pd.DataFrame(read_data_file('forecast_files/ETA40_p011221a051221.dat'))
-df_06 = pd.DataFrame(read_data_file('forecast_files/ETA40_p011221a061221.dat'))
-df_07 = pd.DataFrame(read_data_file('forecast_files/ETA40_p011221a071221.dat'))
-df_08 = pd.DataFrame(read_data_file('forecast_files/ETA40_p011221a081221.dat'))
-df_09 = pd.DataFrame(read_data_file('forecast_files/ETA40_p011221a091221.dat'))
-df_10 = pd.DataFrame(read_data_file('forecast_files/ETA40_p011221a101221.dat'))
-df_11 = pd.DataFrame(read_data_file('forecast_files/ETA40_p011221a111221.dat'))
-
-
-
-# Lista de DataFrames
-dfs = [df_02, df_03, df_04, df_05, df_06, df_07, df_08, df_09, df_10, df_11]
-
-# Mesclando DataFrames usando merge encadeado
-merged_df = pd.merge(df_02, df_02, on=['lat', 'long'], how='inner')
-
-merged_df['data_value'] = merged_df['data_value_x'] + merged_df['data_value_y']
-del merged_df['data_value_x']
-del merged_df['data_value_y']
-
-for df in dfs[2:]:
-    merged_df = pd.merge(merged_df, df, on=['lat', 'long'], how='inner')
-    merged_df['data_value'] = merged_df['data_value_x'] + merged_df['data_value_y']
-    del merged_df['data_value_x']
-    del merged_df['data_value_y']
-
-for x, y in merged_df.iterrows():
-
-    if y['long'] < -50 or y['long'] > -40:
-        del y
-    elif y['lat'] < -23 or y['lat'] > -20:
-        del y
-
-
-df_contour = read_contour_file('/Users/jeanlucevinson/Documents/Projetos/btg/bmg-challange/PSATCMG_CAMARGOS.bln')
-
-# Cria um gráfico de dispersão com as coordenadas
-plt.figure(figsize=(5, 6))  # Define o tamanho do gráfico (opcional)
-plt.scatter(df_contour['lat'], df_contour['long'], color='blue', marker='o', s=8)  # Cria o gráfico de dispersão
-plt.xlabel('Longitude')  # Adiciona rótulo ao eixo x
-plt.ylabel('Latitude')   # Adiciona rótulo ao eixo y
-plt.title('Mapa de Coordenadas')  # Adiciona um título ao gráfico
-plt.show()  # Exibe o gráfico
-
-# Criando um mapa de contorno (contour plot) usando matplotlib
-plt.figure(figsize=(10, 8))
-contour_plot = plt.tricontourf(df['long'], df['lat'], df['data_value'], cmap='YlGnBu')
-plt.colorbar(contour_plot, label='Precipitação Acumulada (mm)')
-plt.title('Previsão de Precipitação Acumulada em 01/12/2021')
-plt.xlabel('Longitude')
-plt.ylabel('Latitude')
-plt.show()
-
-
-print('oi')
-
