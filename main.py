@@ -68,15 +68,28 @@ def apply_contour(contour_df: pd.DataFrame, data_df: pd.DataFrame) -> pd.DataFra
         #somar a precipitação do dia caso as coordenadas estejam iguais
         soma = soma_precipitacao(df_forcast_file, lista_coordenadas)
 
-        # Criar um DataFrame com as datas
+        # Criar um DataFrame com as datas e seus valores de precipitação
         df = montar_df_parcial(data_inicial, data_final, soma)
 
-        #
         df_final.append(df)
 
     #concatenando o df final 
     df_tratado = pd.concat(df_final, ignore_index=True)
     print(df_tratado)
+
+    plotar_grafico_barra(df_tratado)
+
+def plotar_grafico_barra(df_tratado):
+    plt.figure(figsize=(10, 6))
+    plt.bar(df_tratado['forecasted_date'], df_tratado['data_value'], color='skyblue')
+    plt.xlabel('Data de Previsão')
+    plt.ylabel('Valor de Dados')
+    plt.title('Previsão de Precipitação no dia 01/12/2021')
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+
+    # Exibindo o gráfico
+    plt.show()
 
 def montar_df_parcial(data_inicial, data_final, soma):
     return pd.DataFrame(
