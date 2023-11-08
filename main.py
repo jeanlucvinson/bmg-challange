@@ -128,13 +128,9 @@ def coordeandas_dentro_da_area(polygon, points_to_check):
     return lista_coordenadas
 
 def df_coordenadas(df):
-    lista = []
+    df['coordenadas'] = df.apply(lambda row: [row['lat'], row['long']], axis=1)
 
-    for index, row in df.iterrows():
-        row['coordenadas'] = [row['lat'], row['long']]
-        lista.append(row)
-
-    return pd.DataFrame(lista) 
+    return df
 
 def lista_arquvios(pasta):
     nomes_arquivos = []
