@@ -1,11 +1,7 @@
 import pandas as pd
 import re
-import time
-from functools import wraps
 import pandas as pd
 import matplotlib.pyplot as plt
-import seaborn as sns
-import geopandas as gpd
 import pandas as pd
 import os
 from shapely.geometry import Polygon, Point
@@ -79,14 +75,29 @@ def apply_contour(contour_df: pd.DataFrame, data_df: pd.DataFrame) -> pd.DataFra
 
     plotar_grafico_barra(df_tratado)
 
+
 def plotar_grafico_barra(df_tratado):
     plt.figure(figsize=(10, 6))
-    plt.bar(df_tratado['forecasted_date'], df_tratado['data_value'], color='skyblue')
-    plt.xlabel('Data de Previsão')
-    plt.ylabel('Valor de Dados')
-    plt.title('Previsão de Precipitação no dia 01/12/2021')
-    plt.xticks(rotation=45)
-    plt.tight_layout()
+    bars = plt.bar(df_tratado['forecasted_date'], df_tratado['data_value'], color='skyblue')
+
+    for bar in bars:
+        yval = bar.get_height()
+        plt.text(bar.get_x() + bar.get_width()/2.0, yval, round(yval, 1), ha='center', va='bottom')
+
+    media = df_tratado['data_value'].mean()
+
+    plt.axhline(y=media, color='red', linestyle='--', label=f'Média: {round(media, 1)}')
+    plt.legend(fontsize=10)
+
+    # Personalizando rótulos e título
+    plt.xlabel('Data de Previsão', fontsize=12)
+    plt.ylabel('Precipitação', fontsize=12)
+    plt.title('Previsão de Precipitação no dia 01/12/2021', fontsize=14)
+
+    # Personalizando fontes e adicionando grade
+    plt.xticks(rotation=45, fontsize=10)
+    plt.yticks(fontsize=10)
+    plt.grid(axis='y', linestyle='--', alpha=0.7)
 
     # Exibindo o gráfico
     plt.show()
